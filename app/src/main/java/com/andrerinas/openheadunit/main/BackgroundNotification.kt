@@ -55,6 +55,7 @@ class BackgroundNotification(private val context: Context) {
                 .setContentText(metadata.artist)
                 .setSubText(progressText)
                 .setSmallIcon(R.drawable.ic_stat_aa)
+                .setColor(0xFF3DDC84.toInt())
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setContentIntent(PendingIntent.getActivity(context, 0, AapProjectionActivity.intent(context),
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE else PendingIntent.FLAG_UPDATE_CURRENT))

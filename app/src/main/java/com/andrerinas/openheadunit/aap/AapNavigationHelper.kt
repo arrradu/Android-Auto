@@ -318,6 +318,7 @@ class AapNavigationHelper(
             (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0)
         val notification = NotificationCompat.Builder(appContext, NAV_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_aa)
+            .setColor(0xFF3DDC84.toInt())
             .setContentTitle(title)
             .setContentText(context.getString(R.string.nav_notification_street_format, street))
             .setPriority(NotificationCompat.PRIORITY_LOW)

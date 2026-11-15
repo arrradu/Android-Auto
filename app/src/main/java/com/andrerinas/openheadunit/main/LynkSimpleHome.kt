@@ -11,10 +11,12 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import com.andrerinas.openheadunit.App
+import com.andrerinas.openheadunit.R
 import com.andrerinas.openheadunit.aap.AapProjectionActivity
 import com.andrerinas.openheadunit.aap.AapService
 import com.andrerinas.openheadunit.utils.AppLog
@@ -53,6 +55,10 @@ class LynkSimpleHome private constructor(private val activity: Activity) {
         // Taps must stop here, or they would press the original home's buttons underneath.
         root.isClickable = true
         root.isFocusable = true
+
+        val icon = ImageView(activity)
+        icon.setImageResource(R.mipmap.ic_launcher)
+        root.addView(icon, LinearLayout.LayoutParams(dp(120), dp(120)))
 
         val title = TextView(activity)
         title.text = "Android Auto"

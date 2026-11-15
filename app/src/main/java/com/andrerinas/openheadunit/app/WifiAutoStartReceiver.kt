@@ -115,6 +115,7 @@ class WifiAutoStartReceiver : BroadcastReceiver() {
 
                 val notification = NotificationCompat.Builder(context, App.bootStartChannel)
                     .setSmallIcon(R.drawable.ic_stat_aa)
+                    .setColor(0xFF3DDC84.toInt())
                     .setContentTitle(context.getString(R.string.wifi_autostart_title))
                     .setContentText(context.getString(R.string.wifi_autostart_content, currentSsid))
                     .setPriority(NotificationCompat.PRIORITY_HIGH)

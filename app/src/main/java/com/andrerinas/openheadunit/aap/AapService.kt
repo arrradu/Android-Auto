@@ -1720,6 +1720,7 @@ class AapService : Service() {
 
         val notification = NotificationCompat.Builder(this, App.bootStartChannel)
             .setSmallIcon(R.drawable.ic_stat_aa)
+            .setColor(0xFF3DDC84.toInt())
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setContentTitle(getString(R.string.app_name))
@@ -4242,6 +4243,7 @@ class AapService : Service() {
 
         val builder = NotificationCompat.Builder(this, App.defaultChannel)
             .setSmallIcon(R.drawable.ic_stat_aa)
+            .setColor(0xFF3DDC84.toInt())
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .setContentTitle("Open Headunit")
@@ -4383,6 +4385,7 @@ class AapService : Service() {
 
         val notification = NotificationCompat.Builder(this, App.bootStartChannel)
             .setSmallIcon(R.drawable.ic_stat_aa)
+            .setColor(0xFF3DDC84.toInt())
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setContentTitle(getString(R.string.app_name))
@@ -4473,6 +4476,7 @@ class AapService : Service() {
 
         val notification = NotificationCompat.Builder(this, App.bootStartChannel)
             .setSmallIcon(R.drawable.ic_stat_aa)
+            .setColor(0xFF3DDC84.toInt())
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentTitle(getString(R.string.boot_loop_paused_title))
             .setContentText(text)
