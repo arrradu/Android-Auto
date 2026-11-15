@@ -45,18 +45,20 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build APK
+      - name: Build the car app and the phone installer
         run: |
           chmod +x ./gradlew
-          ./gradlew :app:assembleGithubDebug --stacktrace
+          ./gradlew :app:assembleGithubDebug :installer:assembleDebug --stacktrace
 
-      - name: Name the APK
+      # The installer looks for the car app by the exact name AA-Lynk-<number>.apk.
+      - name: Name the APKs
         run: |
           mkdir -p out
           cp app/build/outputs/apk/github/debug/*.apk "out/AA-Lynk-${{ github.run_number }}.apk"
+          cp installer/build/outputs/apk/debug/*.apk "out/AA-Lynk-Installer-${{ github.run_number }}.apk"
           ls -la out
 
-      - name: Upload APK to the run
+      - name: Upload APKs to the run
         uses: actions/upload-artifact@v4
         with:
           name: AA-Lynk-${{ github.run_number }}
@@ -64,7 +66,7 @@ jobs:
           if-no-files-found: error
 
       # A release gives a direct download link that opens from a phone browser.
-      - name: Publish APK as a release
+      - name: Publish APKs as a release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}

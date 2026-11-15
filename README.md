@@ -21,3 +21,13 @@ Fiecare modificare urcată în repozitoriu este compilată automat de GitHub Act
 APK-ul apare în pagina Releases, cu numele `AA-Lynk-<număr>.apk`.
 
 Android Auto este marcă înregistrată Google. Acest proiect nu are legătură cu Google.
+
+## Instalare de pe telefon
+
+`AA-Lynk-Installer-<număr>.apk` este o aplicație mică pentru telefon. Cu telefonul conectat la
+hotspotul mașinii, ea descarcă ultima versiune AA Lynk din pagina Releases, o instalează în
+mașină prin ADB (portul 5555) și poate citi un raport de diagnostic din mașină.
+
+Clientul ADB din `installer/` provine din
+[FeiMi CarHelper](https://github.com/jessehoo89/feimi-carhelper), sub GPL-3.0
+(vezi `installer/LICENSE-GPL-3.0`).
