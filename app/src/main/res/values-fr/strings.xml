@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">AA Lynk</string>
+    <string name="app_name">Lynk&amp;Co 900 AA</string>
     <string name="menu">Menu</string>
     <string name="settings">Paramètres</string>
 
@@ -232,7 +232,7 @@
     <string name="no_apps_found">Aucune application trouvée</string>
     <string name="video">Android Auto</string>
     <string name="self_mode">Mode autonome</string>
-    <string name="title">AA Lynk</string>
+    <string name="title">Lynk&amp;Co 900 AA</string>
     <string name="remove">Retirer</string>
     <string name="usb">USB</string>
     <string name="wifi">Wi-Fi</string>

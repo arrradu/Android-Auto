@@ -7,7 +7,8 @@
 
     <application
         android:allowBackup="false"
-        android:label="AA Lynk Installer"
+        android:icon="@mipmap/ic_launcher"
+        android:label="Lynk&amp;Co 900 AA Installer"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
         <activity
             android:name=".MainActivity"

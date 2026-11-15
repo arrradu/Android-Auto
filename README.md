@@ -1,4 +1,4 @@
-# AA Lynk
+# Lynk&Co 900 AA
 
 Receptor Android Auto pentru ecranul unui Lynk & Co 900 (Flyme Auto), pentru uz personal.
 Telefonul se conectează prin Bluetooth, apoi trece pe hotspotul mașinii, iar Android Auto

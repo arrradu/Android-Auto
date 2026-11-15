@@ -139,7 +139,7 @@ public class MainActivity extends Activity {
         root.setPadding(pad, dp(40), pad, pad);
 
         TextView title = new TextView(this);
-        title.setText("AA Lynk Installer");
+        title.setText("Lynk&Co 900 AA Installer");
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         root.addView(title);
