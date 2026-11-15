@@ -73,7 +73,7 @@ public class MainActivity extends Activity {
                     + " getprop ro.build.display.id; getprop ro.board.platform",
             "am get-current-user; pm list users",
             "wm size; wm density",
-            "pm list packages | grep -i -E 'headunit|aa900'",
+            "pm list packages --user 12 | grep -i -E 'headunit|aa900'",
             "dumpsys package " + CAR_PACKAGE + " | grep -E 'versionName|versionCode|firstInstall|lastUpdate'",
             "dumpsys package " + CAR_PACKAGE + " | grep -E 'granted=false'",
             "ip -4 addr | grep inet",
@@ -81,7 +81,8 @@ public class MainActivity extends Activity {
             "dumpsys bluetooth_manager | head -80",
             "ps -A | grep -i -E 'aa900|headunit'",
             "logcat -d -b crash -t 300",
-            "logcat -d -t 6000 | grep -E 'OPENHU|AndroidRuntime|aa900' | tail -2500",
+            // By process, not by text: the car's own services mention the package twice a second.
+            "logcat -d -t 40000 --pid=$(pidof " + CAR_PACKAGE + ") | tail -5000",
     };
 
     private static final int MAX_LOG_CHARS = 2_000_000;

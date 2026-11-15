@@ -180,6 +180,7 @@ class MainActivity : BaseActivity() {
         }
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
+        LynkSimpleHome.attach(this)
         if (Build.VERSION.SDK_INT >= 26) {
             lifecycleScope.launch {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
