@@ -3,7 +3,9 @@ package com.arrradu.aa900.installer;
 import android.app.Activity;
 import android.content.ClipData;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
 import android.graphics.Typeface;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -53,6 +55,7 @@ public class MainActivity extends Activity {
             CAR_PACKAGE + "/com.andrerinas.openheadunit.main.MainActivity";
     private static final String OLD_PACKAGE = "com.andrerinas.headunitrevived";
     private static final String REMOTE_APK = "/data/local/tmp/aa-lynk.apk";
+    private static final int REQUEST_PICK_APK = 1;
 
     /** Runtime permissions the car app needs; granting them here spares the prompts on the car. */
     private static final String[] CAR_PERMISSIONS = {
@@ -150,7 +153,7 @@ public class MainActivity extends Activity {
         statusView.setText("Conectează telefonul la Wi-Fi-ul mașinii (hotspot), apoi apasă butonul 1.");
         root.addView(statusView);
 
-        addButton(root, "1. Instalează AA Lynk în mașină", new Runnable() {
+        addButton(root, "1. Instalează Lynk&Co 900 AA în mașină", new Runnable() {
             public void run() {
                 installFlow();
             }
@@ -163,6 +166,12 @@ public class MainActivity extends Activity {
         addButton(root, "3. Trimite raportul lui Claude", null).setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 shareReport();
+            }
+        });
+
+        addButton(root, "4. Instalează alt APK din telefon", null).setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                pickApk();
             }
         });
 
@@ -204,6 +213,32 @@ public class MainActivity extends Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
         setContentView(root);
+    }
+
+    /** Opens the phone's file picker; the chosen file comes back in [onActivityResult]. */
+    private void pickApk() {
+        // Any file type: many file apps do not label an APK as one, and would grey it out.
+        Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("*/*");
+        try {
+            startActivityForResult(pick, REQUEST_PICK_APK);
+        } catch (Throwable t) {
+            log("Nu am putut deschide selectorul de fișiere: " + t);
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_PICK_APK || resultCode != RESULT_OK || data == null) return;
+        final Uri uri = data.getData();
+        if (uri == null) return;
+        runJob(new Runnable() {
+            public void run() {
+                otherApkFlow(uri);
+            }
+        });
     }
 
     @Override
@@ -387,16 +422,77 @@ public class MainActivity extends Activity {
             return withOld;
         }
 
-        int current = 0;
-        Matcher digits = Pattern.compile("(\\d+)").matcher(sh("am get-current-user", 20000));
-        if (digits.find()) current = Integer.parseInt(digits.group(1));
+        int current = currentUser();
         log("Open Headunit nu a fost găsit. Instalez în spațiul curent: " + current);
         List<Integer> one = new ArrayList<Integer>();
         one.add(current);
         return one;
     }
 
+    /** The Android user the car's main screen is running as. */
+    private int currentUser() {
+        Matcher digits = Pattern.compile("(\\d+)").matcher(sh("am get-current-user", 20000));
+        return digits.find() ? Integer.parseInt(digits.group(1)) : 0;
+    }
+
     // ------------------------------------------------------------------ jobs
+
+    /** Installs an APK the user picked from the phone's storage. */
+    private void otherApkFlow(Uri uri) {
+        log("===== INSTALARE ALT APK =====");
+        setStatus("Copiez fișierul ales ...");
+        File apk = new File(getCacheDir(), "other.apk");
+        try {
+            InputStream in = getContentResolver().openInputStream(uri);
+            OutputStream out = new FileOutputStream(apk);
+            try {
+                byte[] buffer = new byte[64 * 1024];
+                int read;
+                while ((read = in.read(buffer)) > 0) out.write(buffer, 0, read);
+            } finally {
+                out.close();
+                in.close();
+            }
+        } catch (Throwable t) {
+            log("Nu am putut citi fișierul: " + t);
+            setStatus("Nu am putut citi fișierul ales.");
+            return;
+        }
+
+        PackageInfo info = getPackageManager().getPackageArchiveInfo(apk.getPath(), 0);
+        if (info == null) {
+            log("Fișierul ales nu este un APK valid (" + apk.length() + " octeți).");
+            setStatus("Fișierul ales nu este un APK. Arhivele .apks, .xapk și .apkm nu se pot instala așa.");
+            return;
+        }
+        String label = info.packageName;
+        if (info.applicationInfo != null) {
+            // The label can only be read once the info knows where its APK is.
+            info.applicationInfo.sourceDir = apk.getPath();
+            info.applicationInfo.publicSourceDir = apk.getPath();
+            label = String.valueOf(info.applicationInfo.loadLabel(getPackageManager()));
+        }
+        log("Aplicație: " + label + " (" + info.packageName + "), versiunea " + info.versionName
+                + ", " + (apk.length() / (1024 * 1024)) + " MB");
+
+        if (!ensureConnected()) return;
+        int user = currentUser();
+        setStatus("Instalez „" + label + "” în mașină (spațiul " + user + ") ... Nu închide aplicația.");
+        if (!installApk(apk, user)) {
+            setStatus("Instalarea „" + label + "” a eșuat. Apasă 3 și trimite raportul lui Claude.");
+            return;
+        }
+
+        // Start it once, so it is on screen even if the car's menu does not list it yet.
+        String component = sh("cmd package resolve-activity --brief --user " + user
+                + " -c android.intent.category.LAUNCHER " + info.packageName + " | tail -1", 20000).trim();
+        if (component.contains("/")) {
+            log("Pornesc: " + sh("am start --user " + user + " -n " + component, 30000).trim());
+        } else {
+            log("Aplicația nu are un ecran de pornire propriu; nu o pot deschide automat.");
+        }
+        setStatus("Gata. „" + label + "” este instalată în mașină.");
+    }
 
     private void installFlow() {
         log("===== INSTALARE =====");
