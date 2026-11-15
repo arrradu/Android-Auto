@@ -175,20 +175,6 @@ public class MainActivity extends Activity {
             }
         });
 
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        addSmallButton(row, "Oprește Open Headunit", new Runnable() {
-            public void run() {
-                oldAppFlow(false);
-            }
-        });
-        addSmallButton(row, "Repornește Open Headunit", new Runnable() {
-            public void run() {
-                oldAppFlow(true);
-            }
-        });
-        root.addView(row);
-
         commandBox = new EditText(this);
         commandBox.setHint("Comandă primită de la Claude (opțional)");
         commandBox.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
@@ -272,21 +258,6 @@ public class MainActivity extends Activity {
         parent.addView(button, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         return button;
-    }
-
-    private void addSmallButton(LinearLayout row, String text, final Runnable job) {
-        Button button = new Button(this);
-        button.setText(text);
-        button.setAllCaps(false);
-        button.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        button.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                runJob(job);
-            }
-        });
-        buttons.add(button);
-        row.addView(button, new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
     }
 
     /** One job at a time: the car's ADB link is a single connection. */
@@ -410,20 +381,23 @@ public class MainActivity extends Activity {
         Matcher matcher = Pattern.compile("UserInfo\\{(\\d+):").matcher(sh("pm list users", 20000));
         while (matcher.find()) all.add(Integer.parseInt(matcher.group(1)));
 
-        // Where Open Headunit already lives is where the user installed it and where it works.
-        List<Integer> withOld = new ArrayList<Integer>();
-        for (int user : all) {
-            if (sh("pm path --user " + user + " " + OLD_PACKAGE, 20000).contains("package:")) {
-                withOld.add(user);
+        // An update goes where the app already is. A first install goes where Open Headunit is,
+        // if it is still there: that is where the owner set it up and where it works.
+        for (String known : new String[]{CAR_PACKAGE, OLD_PACKAGE}) {
+            List<Integer> found = new ArrayList<Integer>();
+            for (int user : all) {
+                if (sh("pm path --user " + user + " " + known, 20000).contains("package:")) {
+                    found.add(user);
+                }
             }
-        }
-        if (!withOld.isEmpty()) {
-            log("Open Headunit este instalat în spațiile: " + withOld + ". Instalez în aceleași.");
-            return withOld;
+            if (!found.isEmpty()) {
+                log(known + " este instalat în spațiile: " + found + ". Instalez în aceleași.");
+                return found;
+            }
         }
 
         int current = currentUser();
-        log("Open Headunit nu a fost găsit. Instalez în spațiul curent: " + current);
+        log("Prima instalare. Instalez în spațiul curent: " + current);
         List<Integer> one = new ArrayList<Integer>();
         one.add(current);
         return one;
@@ -632,24 +606,6 @@ public class MainActivity extends Activity {
         setStatus("Rulez comanda ...");
         log("$ " + command + "\n" + sh(command, 120000));
         setStatus("Comandă rulată. Apasă 3 ca să trimiți rezultatul lui Claude.");
-    }
-
-    /** Stops Open Headunit so it does not fight AA Lynk for the same Bluetooth channel, or undoes that. */
-    private void oldAppFlow(boolean enable) {
-        log(enable ? "===== REPORNESC OPEN HEADUNIT =====" : "===== OPRESC OPEN HEADUNIT =====");
-        if (!ensureConnected()) return;
-        Matcher matcher = Pattern.compile("UserInfo\\{(\\d+):").matcher(sh("pm list users", 20000));
-        while (matcher.find()) {
-            String user = matcher.group(1);
-            if (!sh("pm path --user " + user + " " + OLD_PACKAGE, 20000).contains("package:")) continue;
-            if (enable) {
-                log("spațiul " + user + ": " + sh("pm enable --user " + user + " " + OLD_PACKAGE, 20000).trim());
-            } else {
-                sh("am force-stop --user " + user + " " + OLD_PACKAGE, 20000);
-                log("spațiul " + user + ": " + sh("pm disable-user --user " + user + " " + OLD_PACKAGE, 20000).trim());
-            }
-        }
-        setStatus(enable ? "Open Headunit este din nou activ." : "Open Headunit este oprit. Îl poți reporni oricând.");
     }
 
     // ------------------------------------------------------------------ download and share
