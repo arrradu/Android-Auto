@@ -5,6 +5,7 @@ import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -12,11 +13,13 @@ import android.os.Looper;
 import android.util.Base64;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -93,11 +96,16 @@ public class MainActivity extends Activity {
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final StringBuilder fullLog = new StringBuilder();
-    private final List<Button> buttons = new ArrayList<Button>();
+    private final List<View> controls = new ArrayList<View>();
 
+    private Ui look;
     private TextView statusView;
+    private TextView moodView;
+    private GradientDrawable moodDot;
+    private int moodDotColor;
+    private ProgressBar progressBar;
     private TextView logView;
-    private ScrollView scroll;
+    private ScrollView logScroll;
     private EditText commandBox;
 
     private final AdbClient.KeyProvider keys = new AdbClient.KeyProvider() {
@@ -135,70 +143,212 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        look = new Ui(this);
+        look.dressWindow(this);
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        int pad = dp(16);
-        root.setPadding(pad, dp(40), pad, pad);
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setPadding(look.dp(20), look.dp(28), look.dp(20), look.dp(36));
+        // Cards cast their shadow past their own edge; the page must not cut it off.
+        page.setClipToPadding(false);
+        page.setClipChildren(false);
 
-        TextView title = new TextView(this);
-        title.setText("Lynk&Co 900 AA Installer");
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        root.addView(title);
+        page.addView(header());
+        page.addView(statusCard(), look.fillWithTop(26));
 
-        statusView = new TextView(this);
-        statusView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        statusView.setPadding(0, dp(8), 0, dp(8));
-        statusView.setText("Conectează telefonul la Wi-Fi-ul mașinii (hotspot), apoi apasă butonul 1.");
-        root.addView(statusView);
-
-        addButton(root, "1. Instalează Lynk&Co 900 AA în mașină", new Runnable() {
+        LinearLayout install = look.primaryButton(
+                "Instalează Android Auto", "Ultima versiune, direct în mașină");
+        onJob(install, new Runnable() {
             public void run() {
                 installFlow();
             }
         });
-        addButton(root, "2. Citește starea mașinii (diagnostic)", new Runnable() {
-            public void run() {
-                reportFlow();
-            }
-        });
-        addButton(root, "3. Trimite raportul lui Claude", null).setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                shareReport();
-            }
-        });
+        page.addView(install, look.fillWithTop(20));
 
-        addButton(root, "4. Instalează alt APK din telefon", null).setOnClickListener(new View.OnClickListener() {
+        page.addView(look.label("Alte acțiuni"), sectionLabel());
+        page.addView(actionsCard(), look.fillWithTop(10));
+
+        page.addView(look.label("Comandă pentru mașină"), sectionLabel());
+        page.addView(commandCard(), look.fillWithTop(10));
+
+        page.addView(look.label("Jurnal"), sectionLabel());
+        page.addView(logCard(), look.fillWithTop(10));
+
+        TextView version = look.text("Lynk&Co 900 AA Installer " + versionName(), 12, look.inkSoft, look.sans);
+        version.setGravity(Gravity.CENTER);
+        page.addView(version, look.fillWithTop(24));
+
+        ScrollView scroller = new ScrollView(this);
+        scroller.setFillViewport(true);
+        scroller.setVerticalScrollBarEnabled(false);
+        scroller.setClipToPadding(false);
+        scroller.setFitsSystemWindows(true);
+        scroller.addView(page);
+        setContentView(scroller);
+
+        setMood(Ui.Mood.IDLE);
+    }
+
+    private LinearLayout.LayoutParams sectionLabel() {
+        LinearLayout.LayoutParams params = look.fillWithTop(30);
+        params.leftMargin = look.dp(6);
+        return params;
+    }
+
+    private String versionName() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Throwable t) {
+            return "";
+        }
+    }
+
+    private View header() {
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.mipmap.ic_launcher);
+        icon.setElevation(look.dp(4));
+        header.addView(icon, new LinearLayout.LayoutParams(look.dp(52), look.dp(52)));
+
+        LinearLayout words = new LinearLayout(this);
+        words.setOrientation(LinearLayout.VERTICAL);
+        words.setPadding(look.dp(16), 0, 0, 0);
+        TextView eyebrow = look.label("Installer");
+        eyebrow.setTextColor(look.accent);
+        words.addView(eyebrow);
+        TextView title = look.text("Lynk&Co 900", 30, look.ink, look.serif);
+        title.setPadding(0, look.dp(6), 0, 0);
+        words.addView(title);
+        header.addView(words);
+        return header;
+    }
+
+    private View statusCard() {
+        LinearLayout card = look.card();
+        card.setPadding(look.dp(22), look.dp(20), look.dp(22), look.dp(22));
+
+        LinearLayout pill = new LinearLayout(this);
+        pill.setOrientation(LinearLayout.HORIZONTAL);
+        pill.setGravity(Gravity.CENTER_VERTICAL);
+        moodDotColor = look.idle;
+        moodDot = look.rounded(moodDotColor, 5);
+        View dot = new View(this);
+        dot.setBackground(moodDot);
+        pill.addView(dot, new LinearLayout.LayoutParams(look.dp(10), look.dp(10)));
+        moodView = look.label("Pregătit");
+        moodView.setPadding(look.dp(10), 0, 0, 0);
+        pill.addView(moodView);
+        card.addView(pill);
+
+        statusView = look.text(
+                "Conectează telefonul la Wi-Fi-ul mașinii, apoi apasă butonul de mai jos.",
+                21, look.ink, look.serif);
+        statusView.setLineSpacing(look.dp(5), 1f);
+        card.addView(statusView, look.fillWithTop(14));
+
+        progressBar = look.progressBar();
+        progressBar.setVisibility(View.GONE);
+        LinearLayout.LayoutParams bar = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, look.dp(7));
+        bar.topMargin = look.dp(18);
+        card.addView(progressBar, bar);
+        return card;
+    }
+
+    private View actionsCard() {
+        LinearLayout card = look.card();
+
+        LinearLayout other = look.actionRow("+", "Instalează alt APK", "Alege un fișier din memoria telefonului");
+        other.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 pickApk();
             }
         });
+        controls.add(other);
+        card.addView(other);
+        card.addView(look.divider());
+
+        LinearLayout diagnostic = look.actionRow("i", "Diagnostic", "Citește starea mașinii");
+        onJob(diagnostic, new Runnable() {
+            public void run() {
+                reportFlow();
+            }
+        });
+        card.addView(diagnostic);
+        card.addView(look.divider());
+
+        LinearLayout share = look.actionRow("\u2197", "Trimite raportul", "Către Claude sau altă aplicație");
+        share.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                shareReport();
+            }
+        });
+        card.addView(share);
+        return card;
+    }
+
+    private View commandCard() {
+        LinearLayout card = look.card();
+        card.setPadding(look.dp(16), look.dp(16), look.dp(16), look.dp(16));
 
         commandBox = new EditText(this);
-        commandBox.setHint("Comandă primită de la Claude (opțional)");
+        commandBox.setHint("Lipește aici comanda primită de la Claude");
+        commandBox.setHintTextColor(look.inkSoft);
+        commandBox.setTextColor(look.ink);
         commandBox.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         commandBox.setTypeface(Typeface.MONOSPACE);
-        commandBox.setMaxLines(4);
-        root.addView(commandBox);
-        addButton(root, "Rulează comanda în mașină", new Runnable() {
+        commandBox.setMinLines(2);
+        commandBox.setMaxLines(5);
+        commandBox.setGravity(Gravity.TOP | Gravity.START);
+        commandBox.setPadding(look.dp(14), look.dp(12), look.dp(14), look.dp(12));
+        commandBox.setBackground(look.rounded(look.dark ? 0xFF262624 : 0xFFF5F4EE, 14));
+        card.addView(commandBox, look.fill());
+
+        TextView run = look.tonalButton("Rulează în mașină");
+        onJob(run, new Runnable() {
             public void run() {
                 commandFlow(commandBox.getText().toString().trim());
             }
         });
+        card.addView(run, look.fillWithTop(12));
+        return card;
+    }
 
-        logView = new TextView(this);
-        logView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-        logView.setTypeface(Typeface.MONOSPACE);
+    private View logCard() {
+        logView = look.text("Aici apare tot ce face aplicația.\n", 11, look.insetText, Typeface.MONOSPACE);
+        logView.setIncludeFontPadding(true);
         logView.setTextIsSelectable(true);
-        logView.setPadding(0, dp(12), 0, dp(40));
+        logView.setPadding(look.dp(16), look.dp(14), look.dp(16), look.dp(14));
 
-        scroll = new ScrollView(this);
-        scroll.addView(logView);
-        root.addView(scroll, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+        logScroll = new ScrollView(this);
+        logScroll.setBackground(look.rounded(look.inset, 20));
+        logScroll.setClipToOutline(true);
+        logScroll.addView(logView);
+        // The log scrolls inside a page that also scrolls: while a finger is on the log, the page waits.
+        logScroll.setOnTouchListener(new View.OnTouchListener() {
+            public boolean onTouch(View v, MotionEvent event) {
+                v.getParent().requestDisallowInterceptTouchEvent(
+                        event.getActionMasked() != MotionEvent.ACTION_UP
+                                && event.getActionMasked() != MotionEvent.ACTION_CANCEL);
+                return false;
+            }
+        });
+        logScroll.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, look.dp(260)));
+        return logScroll;
+    }
 
-        setContentView(root);
+    /** Wires a control to a job that talks to the car; such controls are greyed out while one runs. */
+    private void onJob(View control, final Runnable job) {
+        control.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                runJob(job);
+            }
+        });
+        controls.add(control);
     }
 
     /** Opens the phone's file picker; the chosen file comes back in [onActivityResult]. */
@@ -238,57 +388,84 @@ public class MainActivity extends Activity {
         }).start();
     }
 
-    private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
-    }
-
-    private Button addButton(LinearLayout parent, String text, final Runnable job) {
-        final Button button = new Button(this);
-        button.setText(text);
-        button.setAllCaps(false);
-        button.setGravity(Gravity.CENTER);
-        if (job != null) {
-            button.setOnClickListener(new View.OnClickListener() {
-                public void onClick(View v) {
-                    runJob(job);
-                }
-            });
-            buttons.add(button);
-        }
-        parent.addView(button, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        return button;
-    }
-
     /** One job at a time: the car's ADB link is a single connection. */
     private void runJob(final Runnable job) {
-        setButtonsEnabled(false);
+        setControlsEnabled(false);
+        setMood(Ui.Mood.BUSY);
+        showProgress(-1);
         worker.execute(new Runnable() {
             public void run() {
                 try {
                     job.run();
                 } catch (Throwable t) {
                     log("EROARE: " + t);
-                    setStatus("A apărut o eroare. Apasă 3 și trimite raportul lui Claude.");
+                    setStatus("A apărut o eroare. Apasă „Trimite raportul” și trimite-l lui Claude.");
                 } finally {
-                    setButtonsEnabled(true);
+                    setControlsEnabled(true);
+                    hideProgress();
+                    setMood(moodFor(lastStatus));
                 }
             }
         });
     }
 
-    private void setButtonsEnabled(final boolean enabled) {
+    /** Reads the outcome off the last thing the job told the user. */
+    private static Ui.Mood moodFor(String status) {
+        if (status.startsWith("Gata") || status.startsWith("Diagnostic gata")
+                || status.startsWith("Comandă rulată")) {
+            return Ui.Mood.OK;
+        }
+        return Ui.Mood.PROBLEM;
+    }
+
+    private void setControlsEnabled(final boolean enabled) {
         ui.post(new Runnable() {
             public void run() {
-                for (Button button : buttons) button.setEnabled(enabled);
+                for (View control : controls) look.setEnabled(control, enabled);
             }
         });
     }
 
+    private volatile String lastStatus = "";
+
     private void setStatus(final String text) {
+        lastStatus = text;
         ui.post(new Runnable() {
             public void run() {
                 statusView.setText(text);
+                statusView.setAlpha(0.35f);
+                statusView.animate().alpha(1f).setDuration(260).start();
+            }
+        });
+    }
+
+    private void setMood(final Ui.Mood mood) {
+        ui.post(new Runnable() {
+            public void run() {
+                int color = look.moodColor(mood);
+                look.tintDot(moodDot, moodDotColor, color);
+                moodDotColor = color;
+                moodView.setText(look.moodWord(mood).toUpperCase());
+                moodView.setTextColor(mood == Ui.Mood.IDLE ? look.inkSoft : color);
+            }
+        });
+    }
+
+    /** Shows the bar at a percentage, or as a running bar when the amount is unknown (-1). */
+    private void showProgress(final int percent) {
+        ui.post(new Runnable() {
+            public void run() {
+                progressBar.setVisibility(View.VISIBLE);
+                progressBar.setIndeterminate(percent < 0);
+                if (percent >= 0) progressBar.setProgress(percent, true);
+            }
+        });
+    }
+
+    private void hideProgress() {
+        ui.post(new Runnable() {
+            public void run() {
+                progressBar.setVisibility(View.GONE);
             }
         });
     }
@@ -309,9 +486,9 @@ public class MainActivity extends Activity {
                 String next = shown + stamped;
                 if (next.length() > 20_000) next = next.substring(next.length() - 20_000);
                 logView.setText(next);
-                scroll.post(new Runnable() {
+                logScroll.post(new Runnable() {
                     public void run() {
-                        scroll.fullScroll(View.FOCUS_DOWN);
+                        logScroll.fullScroll(View.FOCUS_DOWN);
                     }
                 });
             }
@@ -453,7 +630,7 @@ public class MainActivity extends Activity {
         int user = currentUser();
         setStatus("Instalez „" + label + "” în mașină (spațiul " + user + ") ... Nu închide aplicația.");
         if (!installApk(apk, user)) {
-            setStatus("Instalarea „" + label + "” a eșuat. Apasă 3 și trimite raportul lui Claude.");
+            setStatus("Instalarea „" + label + "” a eșuat. Apasă „Trimite raportul” și trimite-l lui Claude.");
             return;
         }
 
@@ -472,7 +649,7 @@ public class MainActivity extends Activity {
         log("===== INSTALARE =====");
         if (!ensureConnected()) return;
 
-        setStatus("Descarc ultima versiune AA Lynk de pe GitHub ...");
+        setStatus("Descarc ultima versiune Android Auto de pe GitHub ...");
         File apk = downloadLatestApk();
         if (apk == null) {
             setStatus("Nu am putut descărca APK-ul. Verifică internetul și încearcă din nou.");
@@ -494,15 +671,15 @@ public class MainActivity extends Activity {
             }
         }
         if (!installedOnce) {
-            setStatus("Instalarea a eșuat. Apasă 3 și trimite raportul lui Claude.");
+            setStatus("Instalarea a eșuat. Apasă „Trimite raportul” și trimite-l lui Claude.");
             return;
         }
 
         int launchUser = users.get(0);
-        log("Pornesc AA Lynk: " + sh("am start --user " + launchUser + " -n " + CAR_ACTIVITY, 30000).trim());
+        log("Pornesc Android Auto: " + sh("am start --user " + launchUser + " -n " + CAR_ACTIVITY, 30000).trim());
         setStatus(allOk
-                ? "Gata. AA Lynk este instalat și pornit pe ecranul mașinii."
-                : "AA Lynk este instalat, dar nu în toate spațiile. Trimite raportul lui Claude.");
+                ? "Gata. Android Auto este instalat și pornit pe ecranul mașinii."
+                : "Android Auto este instalat, dar nu în toate spațiile. Trimite raportul lui Claude.");
     }
 
     private boolean installApk(File apk, int user) {
@@ -514,6 +691,7 @@ public class MainActivity extends Activity {
                 long percent = done * 100 / size;
                 if (percent / 10 != lastShown / 10) {
                     lastShown = percent;
+                    showProgress((int) percent);
                     log("  trimis " + percent + "%");
                 }
             }
@@ -594,7 +772,7 @@ public class MainActivity extends Activity {
         for (String command : REPORT_COMMANDS) {
             log("$ " + command + "\n" + sh(command, 60000));
         }
-        setStatus("Diagnostic gata. Apasă 3 ca să trimiți raportul lui Claude.");
+        setStatus("Diagnostic gata. Apasă „Trimite raportul” ca să îl trimiți lui Claude.");
     }
 
     private void commandFlow(String command) {
@@ -605,7 +783,7 @@ public class MainActivity extends Activity {
         if (!ensureConnected()) return;
         setStatus("Rulez comanda ...");
         log("$ " + command + "\n" + sh(command, 120000));
-        setStatus("Comandă rulată. Apasă 3 ca să trimiți rezultatul lui Claude.");
+        setStatus("Comandă rulată. Apasă „Trimite raportul” ca să trimiți rezultatul lui Claude.");
     }
 
     // ------------------------------------------------------------------ download and share
@@ -649,6 +827,7 @@ public class MainActivity extends Activity {
                     file.write(buffer, 0, read);
                     done += read;
                     long step = total > 0 ? done * 10 / total : done / (10 * 1024 * 1024);
+                    if (total > 0) showProgress((int) (done * 100 / total));
                     if (step != lastShown) {
                         lastShown = step;
                         log("  descărcat " + (done / (1024 * 1024)) + " MB");
@@ -700,7 +879,7 @@ public class MainActivity extends Activity {
             text = fullLog.toString();
         }
         if (text.isEmpty()) {
-            setStatus("Nu am încă nimic de trimis. Apasă mai întâi 1 sau 2.");
+            setStatus("Nu am încă nimic de trimis. Rulează mai întâi o instalare sau diagnosticul.");
             return;
         }
         try {
